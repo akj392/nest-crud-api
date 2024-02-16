@@ -11,35 +11,42 @@ import { json } from 'express';
 dotenv.config();
 
 async function bootstrap() {
+  const scriptName = process.env.npm_lifecycle_script || '';
   let currentPort: number = Number(process.env.PORT);
-  const cpus = availableParallelism();
-  if (cluster.isPrimary) {
-    for (let i = 0; i < cpus; i++) {
-      cluster.fork();
-    }
-    cluster.on('exit', (worker) => {
-      console.log(`Worker ${worker.process.pid} died`);
-      worker.process.kill();
-    });
-  } else {
-
-    currentPort = currentPort + cluster.worker.id - 1;
-    const app = await NestFactory.create<NestExpressApplication>(AppModule,
-      { rawBody: true });
-
-    app.enableCors({ origin: '*' });
-    app.use(json());
-    app.use((req, res, next) => {
-      if (req.headers.host === 'localhost:4000') {
-        proxyRequest(req, res)
-      } else {
-        next();
+  if (scriptName.includes('multi')) {
+    const cpus = availableParallelism();
+    if (cluster.isPrimary) {
+      for (let i = 0; i < cpus; i++) {
+        cluster.fork();
       }
-    });
-    await app.listen(currentPort, 'localhost');
+      cluster.on('exit', (worker) => {
+        console.log(`Worker ${worker.process.pid} died`);
+        worker.process.kill();
+      });
+    } else {
 
+      currentPort = currentPort + cluster.worker.id - 1;
+      const app = await NestFactory.create<NestExpressApplication>(AppModule,
+        { rawBody: true });
+
+      app.enableCors({ origin: '*' });
+      app.use(json());
+      app.use((req, res, next) => {
+        if (req.headers.host === 'localhost:4000') {
+          proxyRequest(req, res)
+        } else {
+          next();
+        }
+      });
+      await app.listen(currentPort, 'localhost');
+      console.log(`Application (PID:${process.pid}) is running on: ${await app.getUrl()}`);
+    }
+  }else{
+    const app = await NestFactory.create(AppModule);
+    await app.listen(currentPort, 'localhost');
     console.log(`Application (PID:${process.pid}) is running on: ${await app.getUrl()}`);
   }
+
 }
 
 bootstrap();
