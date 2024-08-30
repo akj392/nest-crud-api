@@ -20,9 +20,7 @@ export class AppController {
       const user = await this.dbService.get(params.id)
       if (user)
         return user
-
-     return 'User not found!'
-     
+     return 'User not found!'  
     }
   }
 
@@ -61,6 +59,4 @@ export class AppController {
       return 'User not found!'
     }
   }
-
-
 }
